@@ -106,11 +106,10 @@ export default function ChatAssistant() {
         if (!res.ok) throw new Error('Agent endpoint unavailable');
         data = await res.json();
       } catch {
-        // Fallback to client-side Gemini (local dev)
-        const { chatWithGemini } = await import('../lib/geminiApi.js');
-        const profile = { name: currentUser?.name || 'Artisan', craft: currentUser?.craft || 'Pottery', location: currentUser?.location || 'India', totalSales: 81700 };
-        const result = await chatWithGemini(userMsg, profile, messages);
-        data = { reply: result.reply, replyHi: result.replyHi, toolUsed: 'none', agentMode: false, suggestedActions: [] };
+        // Fallback to client-side agent (local dev — full agent with tools)
+        const { runAgent } = await import('../lib/agentLocal.js');
+        const profile = { name: currentUser?.name || 'Raju Kumar', craft: currentUser?.craft || 'Pottery', location: currentUser?.location || 'Khurja, UP', totalSales: 81700, group: currentUser?.group_status || 'OBC' };
+        data = await runAgent(userMsg, profile, messages, lang);
       }
 
       const reply = lang === 'hi' ? (data.replyHi || data.reply) : data.reply;
