@@ -1,77 +1,84 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from '../hooks/useTranslation';
 import { products } from '../data/demoData';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 
 export default function Listings() {
   const navigate = useNavigate();
+  const { t, lang } = useTranslation();
   const myProducts = products.filter((p) => p.sellerId === 'a1');
   const live = myProducts.filter((p) => p.status === 'live').length;
   const pending = myProducts.filter((p) => p.status !== 'live').length;
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }} className="page-container space-y-lg">
-      <motion.section variants={fadeUp}>
-        <button onClick={() => navigate(-1)} className="flex items-center gap-xs text-on-surface-variant mb-xs">
-          <span className="material-symbols-outlined text-[20px]">arrow_back</span><span className="font-body-md text-body-md">Back</span>
+    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+      className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-4xl mx-auto">
+
+      {/* Header */}
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-bold text-[#1F3C88]" style={{ fontFamily: 'Sora, sans-serif' }}>
+          📦 {t('sell.yourListings')}
+        </h1>
+        <button onClick={() => navigate('/listings/new')} 
+          className="self-start px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1F3C88] to-[#4A90E2] text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md">
+          ➕ {t('sell.newListing')}
         </button>
-        <h2 className="font-h1-display text-h1-display text-on-surface">My Listings <br/><span className="font-h2-headline text-h2-headline text-on-surface-variant">मेरे उत्पाद</span></h2>
-      </motion.section>
+      </motion.div>
 
       {/* Stats */}
-      <motion.section variants={fadeUp} className="flex gap-sm">
-        {[{ val: myProducts.length, label: 'Total\nकुल', color: 'text-primary' }, { val: live, label: 'Active\nसक्रिय', color: 'text-secondary-container' }, { val: pending, label: 'Pending\nलंबित', color: 'text-outline' }].map((s, i) => (
-          <div key={i} className="stat-card flex-1">
-            <span className={`font-h2-headline text-h2-headline ${s.color}`}>{s.val}</span>
-            <span className="font-label-caps text-label-caps text-on-surface-variant mt-xs text-center whitespace-pre-line">{s.label}</span>
+      <motion.div variants={fadeUp} className="flex gap-3 mb-6">
+        {[
+          { val: myProducts.length, label: t('common.total'), color: 'text-[#1F3C88]' },
+          { val: live, label: t('common.active'), color: 'text-emerald-600' },
+          { val: pending, label: t('common.pending'), color: 'text-slate-400' },
+        ].map((s, i) => (
+          <div key={i} className="flex-1 bg-white rounded-xl border border-slate-100 p-4 text-center">
+            <div className={`text-xl font-bold ${s.color}`} style={{ fontFamily: 'Sora, sans-serif' }}>{s.val}</div>
+            <div className="text-[11px] text-slate-400 mt-1">{s.label}</div>
           </div>
         ))}
-      </motion.section>
+      </motion.div>
 
       {/* Product Cards */}
-      <section className="flex flex-col gap-md">
+      <div className="space-y-3">
         {myProducts.map((product) => (
-          <motion.div key={product.id} variants={fadeUp} className="card p-sm flex gap-md items-stretch">
-            <div className="w-[100px] h-[120px] shrink-0 rounded-lg overflow-hidden bg-surface-variant">
-              {product.image ? <img src={product.image} alt={product.title} className="w-full h-full object-cover" /> : (
-                <div className="w-full h-full flex items-center justify-center"><span className="material-symbols-outlined text-[32px] text-on-surface-variant">image</span></div>
+          <motion.div key={product.id} variants={fadeUp} 
+            className="bg-white rounded-xl border border-slate-100 p-4 flex gap-4 hover:shadow-md hover:border-slate-200 transition-all">
+            <div className="w-[100px] h-[120px] shrink-0 rounded-xl overflow-hidden bg-slate-50">
+              {product.image ? (
+                <img src={product.image} alt={product.title} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EAF4FF] to-[#e0f9f9]">
+                  <span className="text-3xl opacity-50">🎨</span>
+                </div>
               )}
             </div>
-            <div className="flex flex-col justify-between py-xs pr-sm flex-1">
+            <div className="flex flex-col justify-between py-0.5 flex-1 min-w-0">
               <div>
-                <div className="flex justify-between items-start">
-                  <h3 className="font-h3-title text-h3-title text-on-surface line-clamp-1">{product.title}</h3>
-                  <span className={`font-label-caps text-[10px] px-2 py-1 rounded-full whitespace-nowrap ${product.status === 'live' ? 'bg-secondary-container/20 text-on-secondary-container' : 'bg-surface-variant text-on-surface-variant'}`}>
-                    {product.status.toUpperCase()}
+                <div className="flex justify-between items-start gap-2">
+                  <h3 className="text-sm font-semibold text-slate-800 line-clamp-1">{product.title}</h3>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full whitespace-nowrap font-semibold ${
+                    product.status === 'live' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    {product.status === 'live' ? '● Live' : '○ Review'}
                   </span>
                 </div>
-                <p className="font-body-md text-body-md text-primary font-bold mt-xs">₹{product.price.toLocaleString()}</p>
+                <div className="text-base font-bold text-[#1F3C88] mt-1" style={{ fontFamily: 'Sora, sans-serif' }}>₹{product.price.toLocaleString()}</div>
                 {product.verified && (
-                  <div className="flex items-center gap-xs mt-sm">
-                    <span className="material-symbols-outlined text-[16px] text-tertiary-container filled">verified</span>
-                    <span className="font-label-caps text-label-caps text-tertiary-container">Heritage Verified</span>
-                  </div>
+                  <span className="inline-block text-[10px] font-semibold text-emerald-600 mt-1">✓ {t('sell.aiVerified')}</span>
                 )}
               </div>
-              <div className="flex items-center gap-sm mt-md pt-sm border-t border-outline-variant/20">
-                <button className="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors flex-1 justify-center">
-                  <span className="material-symbols-outlined text-[18px]">edit</span><span className="font-label-caps text-label-caps">Edit</span>
-                </button>
-                <div className="w-px h-4 bg-outline-variant/50"></div>
-                <button className="flex items-center gap-xs text-on-surface-variant hover:text-primary transition-colors flex-1 justify-center">
-                  <span className="material-symbols-outlined text-[18px]">bar_chart</span><span className="font-label-caps text-label-caps">Stats</span>
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-50">
+                <button className="text-[12px] text-slate-400 hover:text-[#4A90E2] transition-colors font-medium">
+                  ✏️ {t('sell.editListing')}
                 </button>
               </div>
             </div>
           </motion.div>
         ))}
-      </section>
-
-      {/* FAB */}
-      <button onClick={() => navigate('/listings/new')} className="fixed bottom-[100px] right-safe-margin w-[56px] h-[56px] bg-primary text-on-primary rounded-xl shadow-[0_4px_20px_rgba(21,21,125,0.3)] flex items-center justify-center hover:scale-95 transition-transform z-40">
-        <span className="material-symbols-outlined text-[28px]">add</span>
-      </button>
+      </div>
     </motion.div>
   );
 }

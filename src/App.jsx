@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './layouts/AppLayout';
+import Landing from './pages/Landing';
+import About from './pages/About';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
 import Marketplace from './pages/Marketplace';
@@ -11,12 +13,19 @@ import SchemeNavigator from './pages/SchemeNavigator';
 import ClusterManagement from './pages/ClusterManagement';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
+import AdminPolicies from './pages/AdminPolicies';
+import ChatAssistant from './components/ChatAssistant';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Onboarding />} />
+        {/* Public pages — no nav */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/onboarding" element={<Onboarding />} />
+
+        {/* App pages — with top navbar */}
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/marketplace" element={<Marketplace />} />
@@ -28,9 +37,13 @@ export default function App() {
           <Route path="/clusters" element={<ClusterManagement />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/admin/policies" element={<AdminPolicies />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      {/* Floating chat button — visible on all app pages */}
+      <ChatAssistant />
     </BrowserRouter>
   );
 }

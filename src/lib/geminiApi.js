@@ -9,13 +9,14 @@ console.log('[Gemini] API Key present:', !!apiKey);
 
 // ─── CORE FETCH HELPER ────────────────────────────────────────
 async function geminiGenerate(contents, jsonMode = true) {
-  const url = `/gemini-api/v1/models/${MODEL}:generateContent?key=${apiKey}`;
+  const url = `/gemini-api/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
   const body = {
     contents,
-    ...(jsonMode && {
-      generationConfig: { responseMimeType: 'application/json' },
-    }),
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 1024,
+    },
   };
 
   const res = await fetch(url, {

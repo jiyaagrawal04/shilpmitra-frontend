@@ -1,66 +1,90 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useTranslation } from '../hooks/useTranslation';
 import { products, categories } from '../data/demoData';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
+const craftEmojis = { All: '🎨', Handloom: '🧵', Pottery: '🏺', Woodwork: '🪵', Jewelry: '💎' };
 
 export default function Marketplace() {
+  const { t, lang } = useTranslation();
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('All');
-  const [search, setSearch] = useState('');
 
-  const filtered = products.filter((p) => {
-    const matchCat = activeCategory === 'All' || p.category === activeCategory;
-    const matchSearch = p.title.toLowerCase().includes(search.toLowerCase());
-    return matchCat && matchSearch && p.status === 'live';
-  });
+  const filtered = activeCategory === 'All' ? products : products.filter(p => p.category === activeCategory || p.craft === activeCategory);
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.05 } } }} className="page-container space-y-md">
-      <motion.h2 variants={fadeUp} className="font-h1-display text-h1-display text-on-surface">Marketplace <br/><span className="font-h2-headline text-h2-headline text-on-surface-variant">बाज़ार</span></motion.h2>
+    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+      className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
 
-      {/* Search */}
-      <motion.div variants={fadeUp} className="relative">
-        <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-        <input className="input-field pl-12" placeholder="Search products..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      {/* Header */}
+      <motion.div variants={fadeUp} className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#1F3C88]" style={{ fontFamily: 'Sora, sans-serif' }}>
+            🛍️ {t('nav.marketplace')}
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {lang === 'hi' ? 'हस्तशिल्प बाज़ार — सीधे कारीगरों से' : 'Handcraft marketplace — directly from artisans'}
+          </p>
+        </div>
+        <button onClick={() => navigate('/listings/new')} 
+          className="self-start px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1F3C88] to-[#4A90E2] text-white text-sm font-semibold hover:opacity-90 transition-opacity flex items-center gap-2 shadow-md">
+          ➕ {t('sell.listProduct')}
+        </button>
       </motion.div>
 
-      {/* Category Chips */}
-      <motion.div variants={fadeUp} className="flex gap-sm overflow-x-auto hide-scrollbar pb-xs">
-        {categories.map((cat) => (
+      {/* Category Filters */}
+      <motion.div variants={fadeUp} className="flex gap-2 overflow-x-auto hide-scrollbar pb-1 mb-6">
+        {categories.map(cat => (
           <button key={cat} onClick={() => setActiveCategory(cat)}
-            className={`chip whitespace-nowrap px-md py-2 rounded-full transition-colors ${activeCategory === cat ? 'bg-primary text-on-primary' : 'bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest'}`}>
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold whitespace-nowrap transition-all ${
+              activeCategory === cat
+                ? 'bg-gradient-to-r from-[#1F3C88] to-[#4A90E2] text-white shadow-md'
+                : 'bg-white text-slate-500 border border-slate-200 hover:border-[#4A90E2]/30 hover:text-slate-700'
+            }`}>
+            <span>{craftEmojis[cat] || '🎨'}</span>
             {cat}
           </button>
         ))}
       </motion.div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-2 gap-sm">
-        {filtered.map((product) => (
-          <motion.div key={product.id} variants={fadeUp} onClick={() => navigate(`/marketplace/${product.id}`)}
-            className="card overflow-hidden cursor-pointer hover:shadow-md transition-shadow group">
-            <div className="aspect-[3/4] bg-surface-variant overflow-hidden">
+      <motion.div variants={fadeUp} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {filtered.map(product => (
+          <motion.div key={product.id} variants={fadeUp}
+            onClick={() => navigate(`/marketplace/${product.id}`)}
+            className="bg-white rounded-xl border border-slate-100 overflow-hidden cursor-pointer group hover:shadow-lg hover:border-slate-200 transition-all duration-300">
+            
+            {/* Image */}
+            <div className="aspect-square bg-slate-50 relative overflow-hidden">
               {product.image ? (
-                <img src={product.image} alt={product.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={product.image} alt={product.title} loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-on-surface-variant">
-                  <span className="material-symbols-outlined text-[48px]">image</span>
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#EAF4FF] to-[#e0f9f9]">
+                  <span className="text-5xl opacity-60">{craftEmojis[product.craft] || '🎨'}</span>
+                </div>
+              )}
+              {product.verified && (
+                <div className="absolute top-2 right-2 bg-emerald-500 text-white px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1">
+                  ✓ AI Verified
                 </div>
               )}
             </div>
-            <div className="p-sm">
-              <h3 className="font-body-md text-body-md font-semibold text-on-surface line-clamp-1">{product.title}</h3>
-              <p className="font-body-md text-body-md text-primary font-bold mt-xs">₹{product.price.toLocaleString()}</p>
-              <div className="flex items-center gap-xs mt-xs">
-                {product.verified && <span className="material-symbols-outlined text-[14px] text-sage filled">verified</span>}
-                <span className="font-label-caps text-label-caps text-on-surface-variant">{product.craft}</span>
+
+            {/* Info */}
+            <div className="p-3">
+              <h3 className="text-sm font-semibold text-slate-800 line-clamp-1">{product.title}</h3>
+              <p className="text-xs text-slate-400 mt-0.5">{product.titleHi}</p>
+              <div className="flex items-center justify-between mt-2.5">
+                <span className="text-base font-bold text-[#1F3C88]" style={{ fontFamily: 'Sora, sans-serif' }}>₹{product.price.toLocaleString()}</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 font-medium">{product.craft}</span>
               </div>
             </div>
           </motion.div>
         ))}
-      </div>
+      </motion.div>
     </motion.div>
   );
 }

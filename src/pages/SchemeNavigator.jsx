@@ -1,237 +1,259 @@
 import { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { schemes, eligibilityChecks, artisans, transactions } from '../data/demoData';
-import { chatWithGemini, explainScheme } from '../lib/geminiApi';
+import { motion, AnimatePresence } from 'framer-motion';
+import { chatWithGemini } from '../lib/geminiApi';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 
+const demoArtisans = [
+  {
+    id: 'raju', name: 'Raju', nameHi: 'राजू', craft: 'Block-print', craftHi: 'ब्लॉक-प्रिंट',
+    location: 'Rajasthan', months: 7, totalSales: 62000, emoji: '🖨️',
+    eligibility: {
+      vishwakarma: { status: 'eligible', label: 'पात्र ✅', reason: 'ब्लॉक-प्रिंटिंग अधिसूचित शिल्प है। 7 महीने सत्यापित बिक्री।', reasonEn: 'Block-printing is notified craft. 7 months verified.' },
+      mudra: { status: 'eligible', label: 'शिशु पात्र ✅', reason: '6+ महीने नियमित बिक्री। Trade Record PDF तैयार।', reasonEn: '6+ months sales. Shishu tier (₹50K).' },
+      sfurti: { status: 'not-yet', label: 'अभी नहीं ⏳', reason: '1 सदस्य — 20 चाहिए।', reasonEn: 'Only 1 member. Need 20 for cluster.' },
+    }
+  },
+  {
+    id: 'sunita', name: 'Sunita', nameHi: 'सुनीता', craft: 'Handloom', craftHi: 'हथकरघा',
+    location: 'MP', months: 18, totalSales: 148000, emoji: '🧵',
+    eligibility: {
+      vishwakarma: { status: 'eligible', label: 'पात्र ✅', reason: 'हथकरघा अधिसूचित शिल्प। 18 महीने सत्यापित।', reasonEn: 'Handloom notified craft. 18 months.' },
+      mudra: { status: 'eligible', label: 'किशोर पात्र ✅', reason: '18 महीने = किशोर tier (₹50K–₹5L)।', reasonEn: '18 months = Kishor tier (₹50K-₹5L).' },
+      sfurti: { status: 'not-yet', label: 'लगभग ⏳', reason: '4 सदस्य — 16 और चाहिए।', reasonEn: '4 members. Need 16 more.' },
+    }
+  },
+  {
+    id: 'priya', name: 'Priya', nameHi: 'प्रिया', craft: 'Pottery', craftHi: 'कुम्हार',
+    location: 'Gujarat', months: 2, totalSales: 8000, emoji: '🏺',
+    eligibility: {
+      vishwakarma: { status: 'not-yet', label: 'अभी नहीं ⏳', reason: 'शिल्प योग्य, Aadhaar पंजीकरण शेष।', reasonEn: 'Craft qualifies. Aadhaar registration pending.' },
+      mudra: { status: 'ineligible', label: 'अपात्र ❌', reason: '2 महीने — 6 महीने चाहिए।', reasonEn: '2 months. Need 6 months minimum.' },
+      sfurti: { status: 'ineligible', label: 'अपात्र ❌', reason: 'कोई क्लस्टर नहीं, कोई रिकॉर्ड नहीं।', reasonEn: 'No cluster, no records.' },
+    }
+  }
+];
+
+const schemes = [
+  {
+    id: 'vishwakarma', name: 'PM Vishwakarma', nameHi: 'पीएम विश्वकर्मा', icon: '🔨',
+    max: '₹3 लाख', maxEn: '₹3 Lakh', tag: 'व्यक्तिगत कारीगर',
+    color: 'from-blue-600 to-indigo-700',
+    benefits: ['₹15,000 Toolkit Grant', '₹2L Collateral-free Loan', 'Skill Training', 'Digital Transaction Incentive'],
+    criteria: [
+      { hi: '18 अधिसूचित शिल्पों में लगे हों', en: 'Engaged in 18 notified crafts', done: true },
+      { hi: '18+ आयु, स्व-नियोजित', en: 'Age 18+, self-employed', done: true },
+      { hi: 'PM Vishwakarma पोर्टल पंजीकरण', en: 'Portal registration with Aadhaar', done: false },
+      { hi: 'प्रति परिवार एक सदस्य', en: 'One per family', done: true },
+    ]
+  },
+  {
+    id: 'mudra', name: 'MUDRA Loan', nameHi: 'मुद्रा ऋण', icon: '🏦',
+    max: '₹10 लाख', maxEn: '₹10 Lakh', tag: 'शिशु • किशोर • तरुण',
+    color: 'from-teal-500 to-emerald-600',
+    benefits: ['Shishu: up to ₹50,000', 'Kishor: ₹50K–₹5L', 'Tarun: ₹5L–₹10L', 'No collateral for Shishu/Kishor'],
+    criteria: [
+      { hi: 'गैर-कॉर्पोरेट सूक्ष्म उद्यम', en: 'Non-corporate micro enterprise', done: true },
+      { hi: 'व्यापार गतिविधि प्रमाण', en: 'Business activity proof (Trade PDF)', done: true },
+      { hi: 'आधार + PAN', en: 'Aadhaar + PAN or equivalent', done: false },
+      { hi: '6 महीने नियमित बिक्री', en: '6 months consistent sales', done: true },
+    ]
+  },
+  {
+    id: 'sfurti', name: 'SFURTI', nameHi: 'SFURTI क्लस्टर', icon: '🏘️',
+    max: '₹8 करोड़', maxEn: '₹8 Crore', tag: 'न्यूनतम 20 सदस्य',
+    color: 'from-purple-500 to-violet-700',
+    benefits: ['Cluster infrastructure', 'Common facility center', 'Machinery & equipment', 'Marketing support'],
+    criteria: [
+      { hi: '20+ कारीगर क्लस्टर', en: 'Minimum 20 artisans', done: false },
+      { hi: 'SHG/सहकारी पंजीकरण', en: 'Registered as SHG/cooperative', done: false },
+      { hi: 'संयुक्त टर्नओवर सत्यापन', en: 'Combined turnover verified', done: false },
+      { hi: 'Nodal Agency प्रायोजन', en: 'Nodal Agency sponsorship', done: false },
+    ]
+  }
+];
+
 export default function SchemeNavigator() {
-  const [showDocs, setShowDocs] = useState(false);
+  const [selectedArtisan, setSelectedArtisan] = useState(null);
+  const [expandedScheme, setExpandedScheme] = useState(null);
   const [chatMessages, setChatMessages] = useState([
-    {
-      role: 'ai',
-      text: 'Namaste! I am your ShilpMitra AI assistant. Ask me about government schemes, loans, or your eligibility — in Hindi or English!',
-      textHi: 'नमस्ते! मैं आपका ShilpMitra AI सहायक हूँ। सरकारी योजनाओं, ऋण या पात्रता के बारे में पूछें — हिंदी या अंग्रेजी में!',
-    },
+    { role: 'ai', text: 'नमस्ते! मैं ShilpMitra AI हूँ। योजनाओं के बारे में पूछें!', textEn: 'Ask me about PM Vishwakarma, MUDRA, or SFURTI!' }
   ]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef(null);
-  const matched = schemes.slice(0, 2);
-  const artisan = artisans[0];
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatMessages]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  const handleSendMessage = async () => {
+  const handleSend = async () => {
     const msg = userInput.trim();
     if (!msg || isLoading) return;
-
-    const newUserMsg = { role: 'user', text: msg };
-    setChatMessages((prev) => [...prev, newUserMsg]);
+    setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
     setUserInput('');
     setIsLoading(true);
-
     try {
-      // Pass full conversation history so Gemini has context
-      const history = [...chatMessages, newUserMsg];
-      const result = await chatWithGemini(
-        msg,
-        { name: artisan.name, craft: artisan.craft, location: artisan.location, totalSales: artisan.totalSales },
-        history
-      );
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: 'ai',
-          text: result.reply || 'I could not generate a response. Please try again.',
-          textHi: result.replyHi || '',
-        },
-      ]);
-    } catch (err) {
-      console.error('Chat error:', err);
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: 'Sorry, I encountered an error. Please try again.' },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleExplainScheme = async (schemeName) => {
-    setIsLoading(true);
-    setChatMessages((prev) => [
-      ...prev,
-      { role: 'user', text: `Explain ${schemeName} to me` },
-    ]);
-
-    try {
-      const result = await explainScheme(schemeName, 'hi');
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: result.text, textHi: result.textHi },
-      ]);
+      const result = await chatWithGemini(msg, { name: 'Raju', craft: 'Block-print', location: 'Rajasthan', totalSales: 62000 }, [...chatMessages, { role: 'user', text: msg }]);
+      setChatMessages(prev => [...prev, { role: 'ai', text: result.reply || 'कृपया दोबारा पूछें।' }]);
     } catch {
-      setChatMessages((prev) => [
-        ...prev,
-        { role: 'ai', text: 'Sorry, could not fetch explanation. Please try again.' },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+      setChatMessages(prev => [...prev, { role: 'ai', text: 'क्षमा करें, कृपया दोबारा कोशिश करें।', textEn: 'Connection issue. Please retry.' }]);
+    } finally { setIsLoading(false); }
   };
+
+  const statusBadge = { eligible: 'badge-eligible', 'not-yet': 'badge-not-yet', ineligible: 'badge-ineligible' };
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.07 } } }} className="page-container space-y-lg pb-8">
-      {/* AI Chat Section */}
-      <motion.section variants={fadeUp} className="bg-surface-container-low rounded-xl p-md shadow-ambient border border-outline-variant/30 relative overflow-hidden">
-        <div className="flex items-center gap-2 mb-md border-b border-outline-variant/30 pb-sm">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
-            <span className="material-symbols-outlined text-on-primary-container filled text-[18px]">smart_toy</span>
-          </div>
-          <h3 className="section-title">AI Scheme Assistant</h3>
-          <span className="chip bg-primary-fixed/50 text-primary ml-auto">Gemini</span>
-        </div>
+    <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }} className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl mx-auto">
 
-        {/* Chat Messages */}
-        <div className="max-h-[300px] overflow-y-auto hide-scrollbar space-y-md">
-          {chatMessages.map((msg, i) => (
-            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              {msg.role === 'ai' && (
-                <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center flex-shrink-0">
-                  <span className="material-symbols-outlined text-on-primary-container filled">smart_toy</span>
+      {/* Header */}
+      <motion.div variants={fadeUp} className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#1F3C88]" style={{ fontFamily: 'Sora, sans-serif' }}>✅ Scheme Navigator</h1>
+        <p className="text-sm text-slate-500 mt-1">AI-powered Scheme Eligibility</p>
+      </motion.div>
+
+      {/* Stats Banner */}
+      <motion.div variants={fadeUp} className="grid grid-cols-3 gap-3">
+        {[
+          { num: '40%', label: 'Never apply', color: 'text-red-500' },
+          { num: '40%', label: 'Get rejected', color: 'text-amber-500' },
+          { num: '30%', label: 'Machinery idle', color: 'text-orange-500' },
+        ].map((s, i) => (
+          <div key={i} className="bg-white rounded-xl border border-slate-100 p-4 text-center">
+            <div className={`text-2xl font-extrabold ${s.color}`} style={{ fontFamily: 'Sora, sans-serif' }}>{s.num}</div>
+            <p className="text-[11px] text-slate-400 mt-1">{s.label}</p>
+          </div>
+        ))}
+      </motion.div>
+
+      {/* Scheme Cards */}
+      <motion.section variants={fadeUp}>
+        <h2 className="text-sm font-bold text-slate-700 mb-3">Government Schemes</h2>
+        <div className="space-y-3">
+          {schemes.map(s => (
+            <div key={s.id} className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+              <button className="w-full text-left p-4 flex items-start gap-3" onClick={() => setExpandedScheme(expandedScheme === s.id ? null : s.id)}>
+                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${s.color} flex items-center justify-center text-2xl shrink-0`}>{s.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-slate-800">{s.name}</h3>
+                  <p className="text-[12px] text-slate-400">{s.nameHi} • {s.tag}</p>
                 </div>
-              )}
-              <div className={`max-w-[80%] rounded-2xl p-3 ${
-                msg.role === 'user'
-                  ? 'bg-primary text-on-primary rounded-br-sm'
-                  : 'bg-surface-container rounded-bl-sm'
-              }`}>
-                <p className={`font-body-md text-body-md ${msg.role === 'user' ? '' : 'text-on-surface'}`}>{msg.text}</p>
-                {msg.textHi && (
-                  <p className={`font-body-md text-body-md mt-1 italic ${msg.role === 'user' ? 'text-on-primary/80' : 'text-on-surface-variant'}`}>
-                    {msg.textHi}
-                  </p>
+                <div className="text-right shrink-0">
+                  <div className="text-sm font-bold text-[#1F3C88]" style={{ fontFamily: 'Sora, sans-serif' }}>{s.maxEn}</div>
+                  <span className="text-slate-400">{expandedScheme === s.id ? '▲' : '▼'}</span>
+                </div>
+              </button>
+              <AnimatePresence>
+                {expandedScheme === s.id && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden border-t border-slate-100">
+                    <div className="p-4 space-y-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#4A90E2] mb-2">BENEFITS</p>
+                        <div className="flex flex-wrap gap-2">
+                          {s.benefits.map((b, i) => <span key={i} className="text-[11px] px-2 py-1 rounded-lg bg-[#EAF4FF] text-[#1F3C88] font-medium">{b}</span>)}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-[#4A90E2] mb-2">ELIGIBILITY</p>
+                        {s.criteria.map((c, i) => (
+                          <div key={i} className="flex items-center gap-2 py-1.5">
+                            <span className="text-sm">{c.done ? '✅' : '⭕'}</span>
+                            <div>
+                              <p className="text-[13px] text-slate-700">{c.en}</p>
+                              <p className="text-[11px] text-slate-400">{c.hi}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </motion.div>
                 )}
+              </AnimatePresence>
+            </div>
+          ))}
+        </div>
+      </motion.section>
+
+      {/* Live Demo */}
+      <motion.section variants={fadeUp} className="bg-white rounded-xl border border-slate-100 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-base">👥</span>
+          <h2 className="text-sm font-bold text-slate-700">Live Demo — Tap to check</h2>
+        </div>
+        <div className="flex gap-2 mb-3">
+          {demoArtisans.map(a => (
+            <button key={a.id} onClick={() => setSelectedArtisan(selectedArtisan?.id === a.id ? null : a)}
+              className={`flex-1 p-3 rounded-xl border-2 transition-all text-center ${selectedArtisan?.id === a.id ? 'border-[#4A90E2] bg-[#EAF4FF]' : 'border-slate-200 bg-white hover:border-[#4A90E2]/30'}`}>
+              <div className="text-2xl mb-1">{a.emoji}</div>
+              <p className="text-sm font-semibold text-slate-700">{a.name}</p>
+              <p className="text-[11px] text-slate-400">{a.craftHi}</p>
+            </button>
+          ))}
+        </div>
+        <AnimatePresence>
+          {selectedArtisan && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-2">
+                <div className="flex items-center gap-3 mb-3">
+                  <span className="text-3xl">{selectedArtisan.emoji}</span>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">{selectedArtisan.name} • {selectedArtisan.nameHi}</h3>
+                    <p className="text-[12px] text-slate-400">{selectedArtisan.craft} • {selectedArtisan.months} months • ₹{selectedArtisan.totalSales.toLocaleString('en-IN')}</p>
+                  </div>
+                </div>
+                {['vishwakarma', 'mudra', 'sfurti'].map(sid => {
+                  const e = selectedArtisan.eligibility[sid];
+                  const s = schemes.find(x => x.id === sid);
+                  const badgeColors = { eligible: 'bg-emerald-50 text-emerald-600', 'not-yet': 'bg-orange-50 text-orange-500', ineligible: 'bg-red-50 text-red-500' };
+                  return (
+                    <div key={sid} className="bg-white border border-slate-200 rounded-xl p-3">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-sm font-semibold text-slate-700">{s.icon} {s.name}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${badgeColors[e.status]}`}>{e.label}</span>
+                      </div>
+                      <p className="text-[13px] text-slate-600">{e.reasonEn}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.section>
+
+      {/* AI Chat */}
+      <motion.section variants={fadeUp} className="bg-white rounded-xl border border-slate-100 overflow-hidden">
+        <div className="flex items-center gap-2 p-4 border-b border-slate-100" style={{ background: 'linear-gradient(135deg, #1F3C88, #4A90E2)' }}>
+          <span className="text-lg">🤖</span>
+          <h3 className="text-sm font-bold text-white flex-1">AI Assistant</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">Gemini</span>
+        </div>
+        <div className="max-h-[220px] overflow-y-auto hide-scrollbar space-y-2 p-4 bg-slate-50">
+          {chatMessages.map((msg, i) => (
+            <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              {msg.role === 'ai' && <span className="text-sm mt-1">🤖</span>}
+              <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${msg.role === 'user' ? 'bg-[#1F3C88] text-white rounded-br-md' : 'bg-white text-slate-700 rounded-bl-md border border-slate-100'}`}>
+                <p className="text-[13px]">{msg.text}</p>
+                {msg.textEn && <p className="text-[11px] mt-0.5 opacity-60">{msg.textEn}</p>}
               </div>
             </div>
           ))}
           {isLoading && (
-            <div className="flex gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center flex-shrink-0">
-                <span className="material-symbols-outlined text-on-primary-container filled animate-pulse">smart_toy</span>
-              </div>
-              <div className="bg-surface-container rounded-2xl rounded-bl-sm p-3 flex items-center gap-2">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+            <div className="flex gap-2">
+              <span className="text-sm">🤖</span>
+              <div className="bg-white rounded-2xl rounded-bl-md px-3 py-2 flex gap-1 items-center border border-slate-100">
+                {[0, 150, 300].map(d => <div key={d} className="w-1.5 h-1.5 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
               </div>
             </div>
           )}
           <div ref={chatEndRef} />
         </div>
-
-        {/* Chat Input */}
-        <div className="flex gap-2 mt-md pt-sm border-t border-outline-variant/30">
-          <input
-            className="input-field flex-1 h-[48px]"
-            placeholder="Ask about schemes... / योजनाओं के बारे में पूछें..."
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            disabled={isLoading}
-          />
-          <button
-            onClick={handleSendMessage}
-            disabled={isLoading || !userInput.trim()}
-            className="w-12 h-12 bg-primary text-on-primary rounded-xl flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-40"
-          >
-            <span className="material-symbols-outlined">send</span>
+        <div className="flex gap-2 p-3 border-t border-slate-100">
+          <input className="flex-1 h-10 px-3 rounded-xl bg-slate-50 text-sm border border-slate-200 focus:border-[#4A90E2] outline-none transition-colors" placeholder="Ask about schemes..."
+            value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={isLoading} />
+          <button onClick={handleSend} disabled={isLoading || !userInput.trim()}
+            className="w-10 h-10 bg-[#1F3C88] text-white rounded-xl flex items-center justify-center hover:bg-[#4A90E2] transition-all disabled:opacity-40 text-lg">
+            →
           </button>
         </div>
-      </motion.section>
-
-      {/* Scheme Cards */}
-      <motion.section variants={fadeUp}>
-        <h2 className="section-title mb-4">Eligible Schemes</h2>
-        <div className="grid grid-cols-1 gap-4">
-          {matched.map((scheme) => (
-            <div key={scheme.id} className="card p-md flex flex-col justify-between relative overflow-hidden group hover:shadow-ambient-sm transition-shadow">
-              <div className="absolute top-0 right-0 bg-secondary-container text-on-secondary-container px-3 py-1 rounded-bl-xl font-label-caps text-label-caps flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">check_circle</span> Match Found
-              </div>
-              <div>
-                <h3 className="font-h3-title text-h3-title text-primary mb-2 mt-4">{scheme.name}</h3>
-                <p className="font-body-md text-body-md text-on-surface-variant mb-2">{scheme.description}</p>
-                <p className="font-label-caps text-label-caps text-primary mb-4">Up to ₹{(scheme.fundingLimit / 100000).toFixed(0)} Lakh</p>
-              </div>
-              <div className="flex gap-2">
-                <button className="btn-outline flex-1">
-                  Apply Now <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                </button>
-                <button
-                  onClick={() => handleExplainScheme(scheme.name)}
-                  className="px-4 py-3 rounded-lg border border-outline-variant text-on-surface-variant font-label-caps text-label-caps hover:bg-surface-container-high transition-colors flex items-center gap-1"
-                >
-                  <span className="material-symbols-outlined text-[16px]">info</span> Explain
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* More Schemes */}
-      <motion.section variants={fadeUp}>
-        <h2 className="section-title mb-4">Other Schemes</h2>
-        <div className="space-y-3">
-          {schemes.slice(2).map((scheme) => (
-            <div key={scheme.id} className="card p-md flex items-center justify-between">
-              <div>
-                <h3 className="font-body-md text-body-md font-semibold text-on-surface">{scheme.name}</h3>
-                <p className="font-label-caps text-label-caps text-on-surface-variant">{scheme.nameHi} • Up to ₹{(scheme.fundingLimit / 100000).toFixed(0)}L</p>
-              </div>
-              <button
-                onClick={() => handleExplainScheme(scheme.name)}
-                className="p-2 text-primary hover:bg-surface-variant rounded-full transition-colors"
-              >
-                <span className="material-symbols-outlined">chevron_right</span>
-              </button>
-            </div>
-          ))}
-        </div>
-      </motion.section>
-
-      {/* Eligibility Checklist */}
-      <motion.section variants={fadeUp} className="card p-md">
-        <h2 className="section-title mb-4">Eligibility Checklist</h2>
-        <ul className="space-y-3">
-          {eligibilityChecks.map((check) => (
-            <li key={check.id} className={`flex items-center gap-4 bg-surface-container-low p-3 rounded-lg ${check.status === 'amber' ? 'border border-secondary-container' : check.status === 'red' ? 'border border-error/30' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                check.status === 'green' ? 'bg-[#e8f5e9]' : check.status === 'amber' ? 'bg-secondary-fixed' : 'bg-error-container'
-              }`}>
-                <span className={`material-symbols-outlined ${
-                  check.status === 'green' ? 'text-[#2e7d32]' : check.status === 'amber' ? 'text-on-secondary-container' : 'text-error'
-                }`}>{check.status === 'green' ? 'check' : check.status === 'amber' ? 'warning' : 'close'}</span>
-              </div>
-              <div className="flex-1">
-                <span className="font-body-md text-body-md text-on-surface block">{check.label}</span>
-                <span className="font-label-caps text-label-caps text-on-surface-variant">{check.detail}</span>
-              </div>
-              {check.status !== 'green' && (
-                <button className="p-2 text-primary hover:bg-surface-variant rounded-full transition-colors">
-                  <span className="material-symbols-outlined">upload_file</span>
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
       </motion.section>
     </motion.div>
   );
