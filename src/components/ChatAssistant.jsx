@@ -1,9 +1,11 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../hooks/useTranslation';
 import { useLocation } from 'react-router-dom';
 import useAppStore from '../store/appStore';
 import { chatWithGemini } from '../lib/geminiApi';
+
+const HIDDEN_PATHS = ['/', '/onboarding', '/about'];
 
 export default function ChatAssistant() {
   const { t, lang } = useTranslation();
@@ -16,7 +18,8 @@ export default function ChatAssistant() {
   const [initialized, setInitialized] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // Initialize greeting after first render
+  const isHidden = useMemo(() => HIDDEN_PATHS.includes(location.pathname), [location.pathname]);
+
   useEffect(() => {
     if (!initialized) {
       setMessages([{
@@ -28,14 +31,11 @@ export default function ChatAssistant() {
     }
   }, [initialized, lang]);
 
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Hide on certain pages
-  const hiddenPaths = ['/', '/onboarding', '/about'];
-  if (hiddenPaths.includes(location.pathname)) return null;
+  if (isHidden) return null;
 
   const handleSend = async () => {
     if (!input.trim() || loading) return;
@@ -56,19 +56,16 @@ export default function ChatAssistant() {
 
   return (
     <>
-      {/* FAB */}
       <button onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-6 right-6 w-14 h-14 rounded-2xl bg-gradient-to-br from-[#1F3C88] to-[#3CCFCF] text-white flex items-center justify-center shadow-lg hover:scale-95 transition-transform z-50 text-2xl">
         {isOpen ? '✕' : '🤖'}
       </button>
 
-      {/* Chat Panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div initial={{ opacity: 0, y: 20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.95 }}
             className="fixed bottom-24 right-6 w-[380px] max-w-[calc(100vw-48px)] h-[480px] max-h-[calc(100vh-140px)] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden z-50">
             
-            {/* Header */}
             <div className="p-4 text-white flex items-center gap-3"
               style={{ background: 'linear-gradient(135deg, #1F3C88, #4A90E2)' }}>
               <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center text-lg">🤖</div>
@@ -78,7 +75,6 @@ export default function ChatAssistant() {
               </div>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50">
               {messages.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -104,7 +100,6 @@ export default function ChatAssistant() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input */}
             <div className="p-3 border-t border-slate-100 bg-white">
               <div className="flex gap-2">
                 <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
