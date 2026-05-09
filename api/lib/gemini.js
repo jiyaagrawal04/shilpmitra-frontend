@@ -46,18 +46,31 @@ export async function generateFromImage(prompt, imageBase64, mimeType = 'image/j
 }
 
 /**
- * Chat with Gemini (multi-turn)
+ * Chat with Gemini (multi-turn) — with retry + longer timeout
  */
-export async function chatGenerate(contents) {
-  const result = await Promise.race([
-    flash.generateContent({ contents }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('AI_TIMEOUT')), 30000)),
-  ]);
+export async function chatGenerate(contents, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const timeout = 45000 + attempt * 15000; // 45s, 60s, 75s
+      const result = await Promise.race([
+        flash.generateContent({ contents }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('AI_TIMEOUT')), timeout)),
+      ]);
 
-  const text = result.response.text();
-  try {
-    return JSON.parse(text.replace(/```json\n?|```/g, '').trim());
-  } catch {
-    return { reply: text, replyHi: text };
+      const text = result.response.text();
+      try {
+        return JSON.parse(text.replace(/```json\n?|```/g, '').trim());
+      } catch {
+        return { reply: text, replyHi: text };
+      }
+    } catch (e) {
+      if (e.message === 'AI_TIMEOUT' && attempt < retries) {
+        console.warn(`[chatGenerate] Timeout on attempt ${attempt + 1}, retrying...`);
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // 1s, 2s backoff
+        continue;
+      }
+      if (e.message === 'AI_TIMEOUT') throw { status: 504, error: 'AI service timeout', retry: true };
+      throw e;
+    }
   }
 }

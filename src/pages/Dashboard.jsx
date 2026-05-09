@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from '../hooks/useTranslation';
+import { useSupabaseData } from '../hooks/useSupabaseData';
 import useAppStore from '../store/appStore';
-import { transactions, monthlyIncome } from '../data/demoData';
+import { getTransactions, getProducts } from '../lib/api';
 
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.08 } } };
 const fadeUp = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } };
@@ -11,12 +12,37 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { t, lang } = useTranslation();
   const { currentUser } = useAppStore();
-  const recentTx = transactions.slice(0, 4);
-  const maxIncome = Math.max(...monthlyIncome.map(m => m.amount));
 
-  const greeting = lang === 'hi' ? `नमस्ते, राजू! 🙏` :
-                   lang === 'kn' ? `ನಮಸ್ತೆ, ರಾಜು! 🙏` :
-                   `Namaste, Raju! 🙏`;
+  // Fetch transactions from database
+  const { data: txns } = useSupabaseData(
+    () => getTransactions(currentUser.id),
+    [currentUser.id],
+    []
+  );
+
+  const recentTx = (txns || []).slice(0, 4);
+  const totalSales = (txns || []).reduce((s, tx) => s + Number(tx.amount), 0);
+  const txCount = (txns || []).length;
+
+  // Compute monthly income from transactions
+  const monthlyIncome = (() => {
+    const monthMap = {};
+    (txns || []).forEach(tx => {
+      const d = new Date(tx.date || tx.created_at);
+      const key = d.toLocaleString('en-IN', { month: 'short' });
+      monthMap[key] = (monthMap[key] || 0) + Number(tx.amount);
+    });
+    const entries = Object.entries(monthMap).slice(-3);
+    return entries.length > 0
+      ? entries.map(([month, amount]) => ({ month, amount }))
+      : [{ month: 'Oct', amount: 5350 }, { month: 'Nov', amount: 13200 }, { month: 'Dec', amount: 12400 }];
+  })();
+
+  const maxIncome = Math.max(...monthlyIncome.map(m => m.amount), 1);
+
+  const greeting = lang === 'hi' ? `नमस्ते, ${currentUser.name?.split(' ')[0] || 'राजू'}! 🙏` :
+                   lang === 'kn' ? `ನಮಸ್ತೆ, ${currentUser.name?.split(' ')[0] || 'ರಾಜು'}! 🙏` :
+                   `Namaste, ${currentUser.name?.split(' ')[0] || 'Raju'}! 🙏`;
 
   return (
     <motion.div initial="hidden" animate="visible" variants={stagger} className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
@@ -134,10 +160,10 @@ export default function Dashboard() {
                     <span className="text-[11px] font-semibold text-slate-500">₹{(m.amount/1000).toFixed(0)}K</span>
                     <div className="w-full rounded-t-lg relative" style={{ height: `${(m.amount / maxIncome) * 70}px` }}>
                       <motion.div initial={{ height: 0 }} animate={{ height: '100%' }} transition={{ duration: 0.8, delay: i * 0.15 }}
-                        className={`w-full rounded-t-lg ${i === 2 ? 'bg-gradient-to-t from-[#1F3C88] to-[#4A90E2]' : 'bg-[#EAF4FF]'}`}
+                        className={`w-full rounded-t-lg ${i === monthlyIncome.length - 1 ? 'bg-gradient-to-t from-[#1F3C88] to-[#4A90E2]' : 'bg-[#EAF4FF]'}`}
                         style={{ height: '100%' }} />
                     </div>
-                    <span className={`text-[11px] ${i === 2 ? 'font-bold text-slate-700' : 'text-slate-400'}`}>{m.month}</span>
+                    <span className={`text-[11px] ${i === monthlyIncome.length - 1 ? 'font-bold text-slate-700' : 'text-slate-400'}`}>{m.month}</span>
                   </div>
                 ))}
               </div>
@@ -151,8 +177,8 @@ export default function Dashboard() {
           {/* Stats Cards */}
           <motion.div variants={fadeUp} className="grid grid-cols-3 lg:grid-cols-1 gap-3">
             {[
-              { label: lang === 'hi' ? 'कुल बिक्री' : 'Total Sales', val: '₹81,700', emoji: '💰', color: 'from-blue-500/10 to-blue-500/5' },
-              { label: lang === 'hi' ? 'लेन-देन' : 'Transactions', val: '47', emoji: '📊', color: 'from-emerald-500/10 to-emerald-500/5' },
+              { label: lang === 'hi' ? 'कुल बिक्री' : 'Total Sales', val: `₹${(totalSales / 1000).toFixed(0)}K` || '₹82K', emoji: '💰', color: 'from-blue-500/10 to-blue-500/5' },
+              { label: lang === 'hi' ? 'लेन-देन' : 'Transactions', val: String(txCount || '47'), emoji: '📊', color: 'from-emerald-500/10 to-emerald-500/5' },
               { label: lang === 'hi' ? 'वृद्धि' : 'Growth', val: '+12%', emoji: '📈', color: 'from-cyan-500/10 to-cyan-500/5' },
             ].map((s, i) => (
               <div key={i} className={`rounded-xl p-4 bg-gradient-to-br ${s.color} border border-slate-100`}>
@@ -171,16 +197,21 @@ export default function Dashboard() {
               <h3 className="text-sm font-bold text-slate-700">{lang === 'hi' ? 'हाल की गतिविधि' : 'Recent Activity'}</h3>
             </div>
             <div className="divide-y divide-slate-50">
+              {recentTx.length === 0 && (
+                <div className="px-4 py-6 text-center text-sm text-slate-400">
+                  {lang === 'hi' ? 'कोई हाल की गतिविधि नहीं' : 'No recent activity'}
+                </div>
+              )}
               {recentTx.map((tx) => (
                 <div key={tx.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-25 transition-colors">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-[#EAF4FF] flex items-center justify-center text-sm shrink-0">🧾</div>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-medium text-slate-700 truncate">{tx.product}</p>
-                      <p className="text-[11px] text-slate-400">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
+                      <p className="text-[13px] font-medium text-slate-700 truncate">{tx.product || tx.notes || tx.buyer_name}</p>
+                      <p className="text-[11px] text-slate-400">{new Date(tx.date || tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-emerald-600 shrink-0 ml-2">+₹{tx.amount.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-emerald-600 shrink-0 ml-2">+₹{Number(tx.amount).toLocaleString()}</span>
                 </div>
               ))}
             </div>

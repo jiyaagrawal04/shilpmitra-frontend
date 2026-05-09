@@ -2,12 +2,16 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { analyzeProduct } from '../lib/geminiApi';
+import { createProduct } from '../lib/api';
+import useAppStore from '../store/appStore';
 
 export default function NewListing() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
   const [step, setStep] = useState('upload');
   const [aiResult, setAiResult] = useState(null);
+  const [publishing, setPublishing] = useState(false);
+  const { currentUser } = useAppStore();
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -16,10 +20,34 @@ export default function NewListing() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const result = await analyzeProduct(reader.result);
-      setAiResult(result);
+      setAiResult({ ...result, photoDataUrl: reader.result });
       setStep('result');
     };
     reader.readAsDataURL(file);
+  };
+
+  const handlePublish = async () => {
+    if (!aiResult || publishing) return;
+    setPublishing(true);
+    try {
+      await createProduct({
+        seller_id: currentUser.id,
+        title: aiResult.title,
+        description: aiResult.description || `${aiResult.title} — handcrafted ${aiResult.craftType || 'artisan product'}`,
+        craft_type: aiResult.craftType || aiResult.category,
+        category: aiResult.category,
+        material: aiResult.material || '',
+        region: aiResult.region || currentUser.location || '',
+        tags: aiResult.tags || [],
+        price: Number(aiResult.suggestedPrice) || 0,
+        photo_url: aiResult.photoUrl || '',
+        is_active: true,
+      });
+      navigate('/listings');
+    } catch (e) {
+      console.error('[NewListing] Publish failed:', e);
+      setPublishing(false);
+    }
   };
 
   return (
@@ -46,7 +74,6 @@ export default function NewListing() {
               <p className="text-caption text-on-surface-variant mt-1">उत्पाद की फोटो अपलोड करें</p>
             </div>
           </button>
-
           <div className="card p-4 flex items-start gap-3">
             <div className="w-10 h-10 rounded-xl gradient-accent flex items-center justify-center flex-shrink-0">
               <span className="material-symbols-outlined text-white filled text-[20px]">auto_awesome</span>
@@ -57,8 +84,6 @@ export default function NewListing() {
               <p className="font-hindi text-caption text-primary-light mt-1">AI स्वचालित रूप से शीर्षक, श्रेणी और कीमत सुझाएगा</p>
             </div>
           </div>
-
-          {/* AI Panel Preview */}
           <div className="card p-4 border-l-4 border-accent bg-accent-light/30">
             <p className="text-overline text-accent mb-2">AI ASSISTANT PREVIEW</p>
             <div className="space-y-2 text-body-sm text-on-surface-variant">
@@ -100,7 +125,8 @@ export default function NewListing() {
             ].map((f) => (
               <div key={f.label}>
                 <label className="text-overline text-on-surface-variant mb-1 block">{f.label}</label>
-                <input className="input-field" defaultValue={f.value} />
+                <input className="input-field" defaultValue={f.value} 
+                  onChange={e => { aiResult[f.label === 'Product Title' ? 'title' : f.label === 'Suggested Price' ? 'suggestedPrice' : f.label === 'Craft Type' ? 'craftType' : 'category'] = e.target.value.replace('₹', ''); }} />
                 {f.sub && <p className="font-hindi text-caption text-on-surface-variant mt-1">{f.sub}</p>}
               </div>
             ))}
@@ -111,8 +137,13 @@ export default function NewListing() {
               </div>
             </div>
           </div>
-          <button onClick={() => navigate('/listings')} className="btn-primary-full">
-            <span className="material-symbols-outlined">publish</span> Publish Listing • प्रकाशित करें
+          <button onClick={handlePublish} disabled={publishing}
+            className={`btn-primary-full flex items-center justify-center gap-2 ${publishing ? 'opacity-60' : ''}`}>
+            {publishing ? (
+              <><span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Saving...</>
+            ) : (
+              <><span className="material-symbols-outlined">publish</span> Publish Listing • प्रकाशित करें</>
+            )}
           </button>
         </motion.div>
       )}

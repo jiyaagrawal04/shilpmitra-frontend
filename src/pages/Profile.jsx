@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from '../hooks/useTranslation';
 import useAppStore from '../store/appStore';
-import { artisans } from '../data/demoData';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 
@@ -10,7 +9,17 @@ export default function Profile() {
   const navigate = useNavigate();
   const { t, lang, setLanguage } = useTranslation();
   const { currentUser } = useAppStore();
-  const artisan = artisans.find((a) => a.id === currentUser.id) || artisans[0];
+  const artisan = {
+    name: currentUser.name || 'Raju Kumar',
+    nameHi: currentUser.nameHi || 'राजू कुमार',
+    avatar: (currentUser.name || 'R')[0],
+    craft: currentUser.craft || currentUser.craft_type || 'Pottery',
+    location: currentUser.location || 'Khurja, UP',
+    verified: true,
+    totalSales: currentUser.totalSales || 81700,
+    activeOrders: 3,
+    fundingEligibility: 80,
+  };
 
   return (
     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }}

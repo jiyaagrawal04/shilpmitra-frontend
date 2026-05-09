@@ -8,7 +8,7 @@ const MODEL = 'gemini-2.5-flash';
 console.log('[Gemini] API Key present:', !!apiKey);
 
 // ─── CORE FETCH HELPER ────────────────────────────────────────
-async function geminiGenerate(contents, jsonMode = true) {
+async function geminiGenerate(contents, jsonMode = true, timeoutMs = 45000) {
   const url = `/gemini-api/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
 
   const body = {
@@ -19,31 +19,44 @@ async function geminiGenerate(contents, jsonMode = true) {
     },
   };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[Gemini] API error:', res.status, errText);
-    throw new Error(`Gemini API error ${res.status}: ${errText}`);
-  }
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
 
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  console.log('[Gemini] Raw response:', text);
-
-  if (jsonMode) {
-    try {
-      return JSON.parse(text.replace(/```json\n?|```/g, '').trim());
-    } catch (e) {
-      console.error('[Gemini] JSON parse error:', e, 'raw:', text);
-      throw new Error('Invalid JSON from Gemini');
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error('[Gemini] API error:', res.status, errText);
+      throw new Error(`Gemini API error ${res.status}: ${errText}`);
     }
+
+    const data = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    console.log('[Gemini] Raw response:', text.substring(0, 200));
+
+    if (jsonMode) {
+      try {
+        return JSON.parse(text.replace(/```json\n?|```/g, '').trim());
+      } catch (e) {
+        console.error('[Gemini] JSON parse error:', e, 'raw:', text);
+        throw new Error('Invalid JSON from Gemini');
+      }
+    }
+    return text;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error('AI_TIMEOUT');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-  return text;
 }
 
 // ─── FALLBACKS ───────────────────────────────────────────────

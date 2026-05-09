@@ -24,24 +24,73 @@ export default function ChatAssistant() {
 
   const isHidden = useMemo(() => HIDDEN_PATHS.includes(location.pathname), [location.pathname]);
 
+  // Regional language string helpers
+  const chatStrings = useMemo(() => {
+    if (lang === 'hi') return {
+      greeting: 'नमस्ते! मैं ShilpMitra AI Agent हूँ। मैं सिर्फ बात नहीं करता — मैं आपके लिए काम करता हूँ! 🤖\n\nमैं कर सकता हूँ:\n• योजना पात्रता जाँचना ✅\n• बैंक प्रूफ / आय प्रमाणपत्र बनाना 🏦\n• लोन एप्लीकेशन PDF बनाना 📋\n• ज़रूरी दस्तावेज़ बताना 📄\n\n🎤 आप बोलकर भी पूछ सकते हैं!',
+      actions: ['✅ मेरी पात्रता जाँचें', '🏦 बैंक प्रूफ बनाएं', '📋 कौन से दस्तावेज़ चाहिए?', '📄 आय प्रमाणपत्र'],
+      loading: '🤖 Agent काम कर रहा है...',
+      loadingRetry: '🔄 फिर से कोशिश कर रहा है...',
+      errorMsg: 'क्षमा करें, कनेक्शन में समस्या हुई। कृपया पुनः प्रयास करें।',
+      retryMsg: 'कनेक्शन धीमा है, पुनः कोशिश कर रहा हूँ...',
+      placeholder: 'बोलें या टाइप करें...',
+      listening: '🎤 बोलिए...',
+      listeningBanner: 'सुन रहा हूँ... बोलिए',
+      speakTitle: 'बोलकर पूछें',
+      stopTts: 'बंद करें',
+      listenTts: '🎧 सुनें',
+      langLabel: 'हिन्दी',
+      voiceUnsupported: 'आपका ब्राउज़र वॉइस इनपुट सपोर्ट नहीं करता',
+      errorActions: ['✅ मेरी पात्रता जाँचें', '📋 कौन से दस्तावेज़ चाहिए?'],
+    };
+    if (lang === 'kn') return {
+      greeting: 'ನಮಸ್ಕಾರ! ನಾನು ShilpMitra AI Agent. ನಾನು ಕೇವಲ ಮಾತನಾಡುವುದಿಲ್ಲ — ನಿಮಗಾಗಿ ಕೆಲಸ ಮಾಡುತ್ತೇನೆ! 🤖\n\nನಾನು ಮಾಡಬಹುದು:\n• ಯೋಜನೆ ಅರ್ಹತೆ ✅\n• ಬ್ಯಾಂಕ್ ಪ್ರೂಫ್ / ಆದಾಯ ಪ್ರಮಾಣಪತ್ರ 🏦\n• ಸಾಲ ಅರ್ಜಿ PDF 📋\n• ಅಗತ್ಯ ದಾಖಲೆಗಳು 📄\n\n🎤 ನೀವು ಮಾತನಾಡಿಯೂ ಕೇಳಬಹುದು!',
+      actions: ['✅ ನನ್ನ ಅರ್ಹತೆ ಪರಿಶೀಲಿಸಿ', '🏦 ಬ್ಯಾಂಕ್ ಪ್ರೂಫ್ ರಚಿಸಿ', '📋 ಯಾವ ದಾಖಲೆಗಳು ಬೇಕು?'],
+      loading: '🤖 Agent ಕೆಲಸ ಮಾಡುತ್ತಿದೆ...',
+      loadingRetry: '🔄 ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ...',
+      errorMsg: 'ಕ್ಷಮಿಸಿ, ಸಂಪರ್ಕ ಸಮಸ್ಯೆ ಆಯಿತು. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.',
+      retryMsg: 'ಸಂಪರ್ಕ ನಿಧಾನವಾಗಿದೆ, ಮತ್ತೊಮ್ಮೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದ್ದೇನೆ...',
+      placeholder: 'ಮಾತನಾಡಿ ಅಥವಾ ಟೈಪ್ ಮಾಡಿ...',
+      listening: '🎤 ಕೇಳುತ್ತಿದ್ದೇನೆ...',
+      listeningBanner: 'ಕೇಳುತ್ತಿದ್ದೇನೆ... ಈಗ ಮಾತನಾಡಿ',
+      speakTitle: 'ಮಾತನಾಡಿ ಕೇಳಿ',
+      stopTts: 'ನಿಲ್ಲಿಸಿ',
+      listenTts: '🎧 ಕೇಳಿ',
+      langLabel: 'ಕನ್ನಡ',
+      voiceUnsupported: 'ನಿಮ್ಮ ಬ್ರೌಸರ್ ಧ್ವನಿ ಇನ್‌ಪುಟ್ ಬೆಂಬಲಿಸುವುದಿಲ್ಲ',
+      errorActions: ['✅ ನನ್ನ ಅರ್ಹತೆ ಪರಿಶೀಲಿಸಿ', '📋 ಯಾವ ದಾಖಲೆಗಳು ಬೇಕು?'],
+    };
+    return {
+      greeting: 'Namaste! I\'m your ShilpMitra AI Agent. I don\'t just chat — I take actions! 🤖\n\nI can:\n• Check your scheme eligibility ✅\n• Generate bank proof from your sales 🏦\n• Create income certificate 📄\n• Tell you what documents you need 📋\n\n🎤 You can also speak to me!',
+      actions: ['✅ Check my eligibility', '🏦 Generate bank proof', '📋 What documents do I need?', '📄 Income certificate'],
+      loading: '🤖 Agent working...',
+      loadingRetry: '🔄 Retrying...',
+      errorMsg: 'Sorry, connection error. Please try again.',
+      retryMsg: 'Connection slow, retrying...',
+      placeholder: 'Speak or type...',
+      listening: '🎤 Listening...',
+      listeningBanner: 'Listening... speak now',
+      speakTitle: 'Speak to ask',
+      stopTts: 'Stop',
+      listenTts: '🎧 Listen',
+      langLabel: 'EN',
+      voiceUnsupported: 'Your browser doesn\'t support voice input',
+      errorActions: ['✅ Check my eligibility', '📋 What documents do I need?'],
+    };
+  }, [lang]);
+
   // Initialize greeting
   useEffect(() => {
     if (!initialized) {
       setMessages([{
         role: 'agent',
-        text: lang === 'hi'
-          ? 'नमस्ते! मैं ShilpMitra AI Agent हूँ। मैं सिर्फ बात नहीं करता — मैं आपके लिए काम करता हूँ! 🤖\n\nमैं कर सकता हूँ:\n• योजना पात्रता जाँचना ✅\n• लोन एप्लीकेशन PDF बनाना 🏦\n• ट्रेड रिकॉर्ड PDF बनाना 📄\n• ज़रूरी दस्तावेज़ बताना 📋\n\n🎤 आप बोलकर भी पूछ सकते हैं!'
-          : 'Namaste! I\'m your ShilpMitra AI Agent. I don\'t just chat — I take actions! 🤖\n\nI can:\n• Check your scheme eligibility ✅\n• Generate loan application PDFs 🏦\n• Create trade record PDFs 📄\n• Tell you what documents you need 📋\n\n🎤 You can also speak to me!',
+        text: chatStrings.greeting,
         time: new Date(),
-        suggestedActions: [
-          '✅ Check my eligibility',
-          '📋 What documents do I need?',
-          '📄 Generate trade record',
-        ]
+        suggestedActions: chatStrings.actions,
       }]);
       setInitialized(true);
     }
-  }, [initialized, lang]);
+  }, [initialized, chatStrings]);
 
   // Auto-scroll
   useEffect(() => {
@@ -89,7 +138,7 @@ export default function ChatAssistant() {
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert(lang === 'hi' ? 'आपका ब्राउज़र वॉइस इनपुट सपोर्ट नहीं करता' : 'Your browser doesn\'t support voice input');
+      alert(chatStrings.voiceUnsupported);
       return;
     }
 
@@ -128,63 +177,103 @@ export default function ChatAssistant() {
   if (isHidden) return null;
 
   // ─── SEND MESSAGE ───────────────────────────────────────
-  const handleSend = async (overrideMsg) => {
+  const handleSend = async (overrideMsg, isRetry = false) => {
     const userMsg = (overrideMsg || input).trim();
     if (!userMsg || loading) return;
     if (!overrideMsg) setInput('');
 
-    setMessages(prev => [...prev, { role: 'user', text: userMsg, time: new Date() }]);
+    if (!isRetry) {
+      setMessages(prev => [...prev, { role: 'user', text: userMsg, time: new Date() }]);
+    }
     setLoading(true);
 
-    try {
-      const userId = currentUser?.id || DEMO_USER_ID;
-      const profile = {
-        name: currentUser?.name || 'Raju Kumar',
-        craft: currentUser?.craft_type || 'Pottery',
-        location: currentUser?.location || 'Khurja, UP',
-        totalSales: 81700,
-        group: currentUser?.group_status || 'OBC',
-      };
+    const MAX_RETRIES = 2;
+    let lastError = null;
 
-      let data;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        // Try Vercel agent endpoint
-        const res = await fetch('/api/agent', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, message: userMsg, language: lang, history: messages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text })) }),
-        });
-        if (!res.ok) throw new Error('Agent unavailable');
-        data = await res.json();
-      } catch {
-        // Fallback: client-side agent (localhost)
-        const { runAgent } = await import('../lib/agentLocal.js');
-        data = await runAgent(userMsg, profile, messages, lang);
+        const userId = currentUser?.id || DEMO_USER_ID;
+        const profile = {
+          id: userId,
+          name: currentUser?.name || 'Raju Kumar',
+          craft: currentUser?.craft_type || currentUser?.craft || 'Pottery',
+          location: currentUser?.location || 'Khurja, UP',
+          totalSales: currentUser?.totalSales || 81700,
+          group: currentUser?.group_status || 'OBC',
+        };
+
+        // Set a 60-second frontend timeout
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 60000);
+
+        let data;
+        try {
+          // Try Vercel agent endpoint
+          const res = await fetch('/api/agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, message: userMsg, language: lang, history: messages.slice(-6).map(m => ({ role: m.role === 'user' ? 'user' : 'model', text: m.text })) }),
+            signal: controller.signal,
+          });
+          if (!res.ok) throw new Error('Agent unavailable');
+          data = await res.json();
+        } catch {
+          // Fallback: client-side agent (localhost)
+          const { runAgent } = await import('../lib/agentLocal.js');
+          data = await runAgent(userMsg, profile, messages, lang);
+        } finally {
+          clearTimeout(timer);
+        }
+
+        const reply = lang === 'hi' ? (data.replyHi || data.reply)
+          : lang === 'kn' ? (data.replyKn || data.reply)
+          : data.reply;
+
+        const agentMsg = {
+          role: 'agent',
+          text: reply || 'I processed your request.',
+          time: new Date(),
+          toolUsed: data.toolUsed,
+          toolResult: data.toolResult,
+          suggestedActions: data.suggestedActions || [],
+          agentMode: data.agentMode,
+        };
+
+        setMessages(prev => [...prev, agentMsg]);
+        setLoading(false);
+        return; // Success, exit
+      } catch (e) {
+        lastError = e;
+        if (attempt < MAX_RETRIES) {
+          console.warn(`[ChatAssistant] Attempt ${attempt + 1} failed, retrying...`, e.message || e.name);
+          // Show retry indicator to user
+          setMessages(prev => {
+            const last = prev[prev.length - 1];
+            if (last?.role === 'agent' && last?.isRetryNotice) {
+              return prev; // Don't stack retry notices
+            }
+            return [...prev, {
+              role: 'agent',
+              text: chatStrings.retryMsg,
+              time: new Date(),
+              isRetryNotice: true,
+            }];
+          });
+          await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+          // Remove the retry notice before next attempt
+          setMessages(prev => prev.filter(m => !m.isRetryNotice));
+          continue;
+        }
       }
-
-      const reply = lang === 'hi' ? (data.replyHi || data.reply) : data.reply;
-
-      const agentMsg = {
-        role: 'agent',
-        text: reply || 'I processed your request.',
-        time: new Date(),
-        toolUsed: data.toolUsed,
-        toolResult: data.toolResult,
-        suggestedActions: data.suggestedActions || [],
-        agentMode: data.agentMode,
-      };
-
-      setMessages(prev => [...prev, agentMsg]);
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'agent',
-        text: lang === 'hi'
-          ? 'क्षमा करें, कनेक्शन में समस्या हुई। कृपया पुनः प्रयास करें।'
-          : 'Sorry, connection error. Please try again.',
-        time: new Date(),
-        suggestedActions: ['✅ Check my eligibility', '📋 What documents do I need?'],
-      }]);
     }
+
+    // All retries exhausted
+    setMessages(prev => prev.filter(m => !m.isRetryNotice).concat([{
+      role: 'agent',
+      text: chatStrings.errorMsg,
+      time: new Date(),
+      suggestedActions: chatStrings.errorActions,
+    }]));
     setLoading(false);
   };
 
@@ -232,7 +321,7 @@ export default function ChatAssistant() {
                 </p>
               </div>
               <div className="text-[10px] bg-white/10 px-2 py-1 rounded-lg">
-                {lang === 'hi' ? 'हिन्दी' : lang === 'kn' ? 'ಕನ್ನಡ' : 'EN'}
+                {chatStrings.langLabel}
               </div>
             </div>
 
@@ -270,9 +359,7 @@ export default function ChatAssistant() {
                             color: ttsPlaying === i ? '#1F3C88' : '#94a3b8',
                           }}>
                           <span className={ttsPlaying === i ? 'animate-pulse' : ''}>{ttsPlaying === i ? '🔊' : '🔈'}</span>
-                          {ttsPlaying === i
-                            ? (lang === 'hi' ? 'बंद करें' : 'Stop')
-                            : (lang === 'hi' ? '🎧 सुनें' : '🎧 Listen')}
+                          {ttsPlaying === i ? chatStrings.stopTts : chatStrings.listenTts}
                         </button>
                       )}
                     </div>
@@ -305,7 +392,7 @@ export default function ChatAssistant() {
                         <div className="w-2 h-2 bg-[#3CCFCF] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
                       <span className="text-[11px] text-slate-400 animate-pulse">
-                        {lang === 'hi' ? '🤖 Agent काम कर रहा है...' : '🤖 Agent working...'}
+                        {chatStrings.loading}
                       </span>
                     </div>
                   </div>
@@ -325,16 +412,14 @@ export default function ChatAssistant() {
                     color: isListening ? 'white' : '#64748b',
                     animation: isListening ? 'pulse 1s infinite' : 'none',
                   }}
-                  title={lang === 'hi' ? 'बोलकर पूछें' : 'Speak to ask'}>
+                  title={chatStrings.speakTitle}>
                   {isListening ? '⏹️' : '🎤'}
                 </button>
 
                 {/* Text Input */}
                 <input type="text" value={input} onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                  placeholder={isListening
-                    ? (lang === 'hi' ? '🎤 बोलिए...' : '🎤 Listening...')
-                    : (lang === 'hi' ? 'बोलें या टाइप करें...' : 'Speak or type...')}
+                  placeholder={isListening ? chatStrings.listening : chatStrings.placeholder}
                   className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 text-sm text-slate-700 placeholder:text-slate-300 border border-slate-200 focus:border-[#4A90E2] focus:outline-none transition-colors" />
 
                 {/* Send Button */}
@@ -346,7 +431,7 @@ export default function ChatAssistant() {
               </div>
               {isListening && (
                 <div className="mt-1.5 text-center text-[10px] text-red-500 font-semibold animate-pulse">
-                  🔴 {lang === 'hi' ? 'सुन रहा हूँ... बोलिए' : 'Listening... speak now'}
+                  🔴 {chatStrings.listeningBanner}
                 </div>
               )}
             </div>

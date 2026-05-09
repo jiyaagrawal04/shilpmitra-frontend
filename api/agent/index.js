@@ -175,12 +175,18 @@ Decide which tool to use. Return ONLY valid JSON:
     }
 
     // 4. Generate final response using tool results
+    const langInstruction = lang === 'hi'
+      ? 'Respond ENTIRELY in Hindi (Devanagari script). Use "जी" suffix for respect. Keep it simple for rural artisans.'
+      : lang === 'kn'
+      ? 'Respond ENTIRELY in Kannada (ಕನ್ನಡ script). Use respectful forms. Keep it simple for rural artisans.'
+      : 'Respond in simple English. Use easy words for rural artisans.';
+
     const responsePrompt = `You are ShilpMitra AI Agent. Generate a helpful, conversational response.
 
 USER: "${message}"
 TOOL USED: ${toolName}
 TOOL RESULT: ${toolResult ? JSON.stringify(toolResult) : 'No tool used'}
-LANGUAGE: ${lang === 'hi' ? 'Hindi' : lang === 'kn' ? 'Kannada' : 'English'}
+LANGUAGE INSTRUCTION: ${langInstruction}
 
 RULES:
 - Be friendly and conversational (not formal)
@@ -189,13 +195,16 @@ RULES:
 - For documents: list what's missing clearly
 - For PDFs: tell user the document is ready to download
 - Keep it concise (3-4 sentences max)
-- If Hindi, respond fully in Hindi. If Kannada, fully in Kannada.
+- The "reply" field MUST be entirely in the user's chosen language
+- Always include "replyHi" in Hindi and "replyKn" in Kannada
+- "suggestedActions" should be in the user's language
 
 Return ONLY valid JSON:
 {
   "reply": "Main response in the requested language",
   "replyEn": "English version (always include)",
   "replyHi": "Hindi version (always include)",
+  "replyKn": "Kannada version (always include)",
   "suggestedActions": ["action button text 1", "action button text 2"]
 }`;
 

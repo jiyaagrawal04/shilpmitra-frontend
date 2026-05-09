@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './layouts/AppLayout';
 import Landing from './pages/Landing';
@@ -15,8 +16,11 @@ import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
 import AdminPolicies from './pages/AdminPolicies';
 import ChatAssistant from './components/ChatAssistant';
+import useAppStore from './store/appStore';
 
 export default function App() {
+  const initUser = useAppStore((s) => s.initUser);
+  useEffect(() => { initUser(); }, [initUser]);
   return (
     <BrowserRouter>
       <Routes>

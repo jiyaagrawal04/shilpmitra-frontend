@@ -37,7 +37,12 @@ export default async function handler(req, res) {
 
     const totalRecent = recentSales.reduce((s, t) => s + Number(t.amount), 0);
 
-    // 4. Build system prompt with context
+    const langInstruction = lang === 'hi'
+      ? 'Respond ENTIRELY in Hindi (Devanagari script). Use "जी" suffix for respect.'
+      : lang === 'kn'
+      ? 'Respond ENTIRELY in Kannada (ಕನ್ನಡ script). Use respectful forms.'
+      : 'Respond in simple English.';
+
     const systemPrompt = `You are ShilpMitra AI, a friendly financial assistant for rural Indian artisans and MSMEs.
 
 ARTISAN PROFILE:
@@ -58,8 +63,8 @@ INSTRUCTIONS:
 - Be conversational and friendly, not formal
 - Keep answers concise (2-3 sentences)
 - If asked about schemes, use the criteria data above
-- Respond in the user's preferred language: ${lang === 'hi' ? 'Hindi' : lang === 'kn' ? 'Kannada' : 'English'}
-- Always return JSON: { "reply": "main response", "replyHi": "Hindi version" }`;
+- ${langInstruction}
+- Always return JSON: { "reply": "main response in user's language", "replyHi": "Hindi version", "replyKn": "Kannada version" }`;
 
     // 5. Build conversation contents
     const contents = [

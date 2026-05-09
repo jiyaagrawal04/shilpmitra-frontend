@@ -1,12 +1,14 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from '../hooks/useTranslation';
-import { transactions, monthlyIncome } from '../data/demoData';
+import { useSupabaseData } from '../hooks/useSupabaseData';
+import { getTransactions } from '../lib/api';
+import useAppStore from '../store/appStore';
 import jsPDF from 'jspdf';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
 
-function generatePDF() {
+function generatePDF(txns, userName = 'Raju Kumar') {
   const doc = new jsPDF();
   doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(31, 60, 136);
   doc.text('ShilpMitra - Trade Record Certificate', 20, 20);
@@ -14,19 +16,20 @@ function generatePDF() {
   doc.text('Auto-generated from verified trade data • AI Verified', 20, 28);
   doc.setDrawColor(203, 213, 225); doc.line(20, 32, 190, 32);
   doc.setFontSize(12); doc.setTextColor(15, 23, 42);
-  doc.text('Artisan: Raju Kumar', 20, 42); doc.text('Craft: Pottery | Location: Khurja, UP', 20, 50);
-  doc.text(`Period: Oct - Dec 2024`, 20, 58); doc.text(`Total Income: Rs ${transactions.reduce((s, t) => s + t.amount, 0).toLocaleString()}`, 20, 66);
+  doc.text(`Artisan: ${userName}`, 20, 42); doc.text('Craft: Pottery | Location: Khurja, UP', 20, 50);
+  doc.text(`Period: Last 18 Months`, 20, 58);
+  doc.text(`Total Income: Rs ${(txns || []).reduce((s, t) => s + Number(t.amount), 0).toLocaleString()}`, 20, 66);
   doc.line(20, 72, 190, 72);
   let y = 82;
   doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
-  ['Date', 'Product', 'Amount', 'UPI Ref'].forEach((h, i) => doc.text(h, [20, 55, 120, 150][i], y));
+  ['Date', 'Product / Notes', 'Amount', 'Buyer'].forEach((h, i) => doc.text(h, [20, 55, 120, 150][i], y));
   y += 8; doc.setFont('helvetica', 'normal');
-  transactions.forEach((tx) => {
+  (txns || []).forEach((tx) => {
     if (y > 270) { doc.addPage(); y = 20; }
-    doc.text(new Date(tx.date).toLocaleDateString('en-IN'), 20, y);
-    doc.text(tx.product.substring(0, 25), 55, y);
-    doc.text(`Rs ${tx.amount.toLocaleString()}`, 120, y);
-    doc.text(tx.upiRef.substring(0, 15), 150, y);
+    doc.text(new Date(tx.date || tx.created_at).toLocaleDateString('en-IN'), 20, y);
+    doc.text((tx.product || tx.notes || '-').substring(0, 25), 55, y);
+    doc.text(`Rs ${Number(tx.amount).toLocaleString()}`, 120, y);
+    doc.text((tx.buyerName || tx.buyer_name || '-').substring(0, 15), 150, y);
     y += 7;
   });
   y += 10; doc.setFont('helvetica', 'italic'); doc.setFontSize(8); doc.setTextColor(148, 163, 184);
@@ -37,8 +40,34 @@ function generatePDF() {
 export default function TradeLedger() {
   const navigate = useNavigate();
   const { t, lang } = useTranslation();
-  const totalIncome = monthlyIncome.reduce((s, m) => s + m.amount, 0);
-  const maxIncome = Math.max(...monthlyIncome.map((m) => m.amount));
+  const { currentUser } = useAppStore();
+
+  const { data: txns, loading } = useSupabaseData(
+    () => getTransactions(currentUser.id),
+    [currentUser.id],
+    []
+  );
+
+  const transactions = txns || [];
+  const totalIncome = transactions.reduce((s, t) => s + Number(t.amount), 0);
+
+  // Compute monthly income from transaction data
+  const monthlyIncome = (() => {
+    const monthMap = {};
+    transactions.forEach(tx => {
+      const d = new Date(tx.date || tx.created_at);
+      const key = d.toLocaleString('en-IN', { month: 'short' });
+      monthMap[key] = (monthMap[key] || 0) + Number(tx.amount);
+    });
+    const entries = Object.entries(monthMap).slice(-3);
+    return entries.length > 0
+      ? entries.map(([month, amount]) => ({ month, amount }))
+      : [{ month: 'Oct', amount: 5350 }, { month: 'Nov', amount: 13200 }, { month: 'Dec', amount: 12400 }];
+  })();
+
+  const maxIncome = Math.max(...monthlyIncome.map(m => m.amount), 1);
+  const latestMonthIncome = monthlyIncome[monthlyIncome.length - 1]?.amount || 0;
+  const verifiedCount = transactions.filter(t => t.verified || t.payment_status === 'completed').length;
 
   return (
     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }} 
@@ -61,14 +90,14 @@ export default function TradeLedger() {
         <div className="flex justify-between items-start relative z-10">
           <div>
             <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">{t('fund.monthlyIncome')}</span>
-            <div className="text-3xl font-bold mt-1" style={{ fontFamily: 'Sora, sans-serif' }}>₹{monthlyIncome[2].amount.toLocaleString()}</div>
+            <div className="text-3xl font-bold mt-1" style={{ fontFamily: 'Sora, sans-serif' }}>₹{latestMonthIncome.toLocaleString()}</div>
           </div>
           <div className="bg-white/15 backdrop-blur-sm rounded-xl px-4 py-2.5 text-center">
-            <div className="text-xl font-bold">{transactions.filter(t => t.verified).length}</div>
+            <div className="text-xl font-bold">{verifiedCount}</div>
             <div className="text-[10px] text-white/60 font-medium">Verified</div>
           </div>
         </div>
-        <button onClick={generatePDF} 
+        <button onClick={() => generatePDF(transactions, currentUser.name)} 
           className="relative z-10 mt-4 w-full bg-white text-[#1F3C88] text-sm font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all">
           📥 {t('fund.downloadProof')}
         </button>
@@ -88,14 +117,21 @@ export default function TradeLedger() {
               <span className="text-[11px] font-semibold text-slate-500">₹{(m.amount/1000).toFixed(0)}K</span>
               <div className="w-full rounded-t-lg relative" style={{ height: `${(m.amount / maxIncome) * 80}px` }}>
                 <motion.div initial={{ height: 0 }} animate={{ height: '100%' }} transition={{ duration: 0.8, delay: i * 0.15 }}
-                  className={`w-full rounded-t-lg ${i === 2 ? 'bg-gradient-to-t from-[#1F3C88] to-[#4A90E2]' : 'bg-[#EAF4FF]'}`}
+                  className={`w-full rounded-t-lg ${i === monthlyIncome.length - 1 ? 'bg-gradient-to-t from-[#1F3C88] to-[#4A90E2]' : 'bg-[#EAF4FF]'}`}
                   style={{ height: '100%' }} />
               </div>
-              <span className={`text-[11px] ${i === 2 ? 'font-bold text-slate-700' : 'text-slate-400'}`}>{m.month}</span>
+              <span className={`text-[11px] ${i === monthlyIncome.length - 1 ? 'font-bold text-slate-700' : 'text-slate-400'}`}>{m.month}</span>
             </div>
           ))}
         </div>
       </motion.div>
+
+      {/* Loading */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="inline-block w-8 h-8 border-3 border-[#4A90E2] border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
 
       {/* Transactions */}
       <motion.div variants={fadeUp} className="bg-white rounded-xl border border-slate-100 overflow-hidden">
@@ -103,21 +139,21 @@ export default function TradeLedger() {
           <h3 className="text-sm font-bold text-slate-700">{t('fund.recentTransactions')}</h3>
         </div>
         <div className="divide-y divide-slate-50">
-          {transactions.slice(0, 6).map((tx) => (
+          {transactions.slice(0, 8).map((tx) => (
             <div key={tx.id} className="px-4 py-3 flex items-center justify-between hover:bg-slate-25 transition-colors">
               <div className="flex items-center gap-3 min-w-0">
                 <div className="w-9 h-9 rounded-lg bg-[#EAF4FF] flex items-center justify-center text-sm shrink-0">🧾</div>
                 <div className="min-w-0">
-                  <p className="text-[13px] font-medium text-slate-700 truncate">{tx.product}</p>
+                  <p className="text-[13px] font-medium text-slate-700 truncate">{tx.product || tx.notes || 'Sale'}</p>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">{new Date(tx.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {tx.buyerName}</span>
-                    {tx.verified && (
+                    <span className="text-[11px] text-slate-400">{new Date(tx.date || tx.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })} • {tx.buyerName || tx.buyer_name}</span>
+                    {(tx.verified || tx.payment_status === 'completed') && (
                       <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-600 font-semibold">✓ Verified</span>
                     )}
                   </div>
                 </div>
               </div>
-              <span className="text-sm font-bold text-emerald-600 shrink-0 ml-2">+₹{tx.amount.toLocaleString()}</span>
+              <span className="text-sm font-bold text-emerald-600 shrink-0 ml-2">+₹{Number(tx.amount).toLocaleString()}</span>
             </div>
           ))}
         </div>
