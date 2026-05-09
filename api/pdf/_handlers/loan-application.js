@@ -1,5 +1,5 @@
-import { supabase } from '../lib/supabase.js';
-import { generateJSON } from '../lib/gemini.js';
+import { supabase } from '../../lib/supabase.js';
+import { generateJSON } from '../../lib/gemini.js';
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
