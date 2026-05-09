@@ -1,8 +1,10 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { chatWithGemini } from '../lib/geminiApi';
+import { useTranslation } from '../hooks/useTranslation';
+import useAppStore from '../store/appStore';
 
 const fadeUp = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0 } };
+const DEMO_USER_ID = '33f29c7a-34b8-4ea0-8a7b-25d323992b91';
 
 const demoArtisans = [
   {
@@ -73,33 +75,97 @@ const schemes = [
   }
 ];
 
+const quickActions = {
+  en: [
+    { label: '✅ Check my eligibility', msg: 'Check my eligibility for all schemes' },
+    { label: '📋 Documents needed?', msg: 'What documents do I need for schemes?' },
+    { label: '🏦 Generate bank proof', msg: 'Generate bank proof from my sales' },
+    { label: '🔨 Explain Vishwakarma', msg: 'Explain PM Vishwakarma scheme in detail' },
+    { label: '🏦 Explain MUDRA', msg: 'Explain MUDRA loan scheme' },
+    { label: '🏘️ Explain SFURTI', msg: 'Explain SFURTI cluster scheme' },
+  ],
+  hi: [
+    { label: '✅ पात्रता जाँचें', msg: 'मेरी सभी योजनाओं की पात्रता जाँचें' },
+    { label: '📋 दस्तावेज़ बताएं', msg: 'योजनाओं के लिए कौन से दस्तावेज़ चाहिए?' },
+    { label: '🏦 बैंक प्रूफ बनाएं', msg: 'मेरी बिक्री से बैंक प्रूफ बनाएं' },
+    { label: '🔨 विश्वकर्मा समझाएं', msg: 'PM विश्वकर्मा योजना के बारे में बताएं' },
+    { label: '🏦 मुद्रा समझाएं', msg: 'मुद्रा ऋण योजना समझाएं' },
+    { label: '🏘️ SFURTI समझाएं', msg: 'SFURTI क्लस्टर योजना समझाएं' },
+  ],
+};
+
 export default function SchemeNavigator() {
+  const { lang } = useTranslation();
+  const { currentUser } = useAppStore();
   const [selectedArtisan, setSelectedArtisan] = useState(null);
   const [expandedScheme, setExpandedScheme] = useState(null);
-  const [chatMessages, setChatMessages] = useState([
-    { role: 'ai', text: 'नमस्ते! मैं ShilpMitra AI हूँ। योजनाओं के बारे में पूछें!', textEn: 'Ask me about PM Vishwakarma, MUDRA, or SFURTI!' }
-  ]);
+  const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const chatEndRef = useRef(null);
 
+  // Initial greeting
+  useEffect(() => {
+    if (chatMessages.length === 0) {
+      const name = currentUser?.name || 'कारीगर';
+      setChatMessages([{
+        role: 'ai',
+        text: lang === 'hi'
+          ? `नमस्ते ${name} जी! 🤖 मैं ShilpMitra AI Agent हूँ।\n\nमैं योजनाओं के बारे में सब बता सकता हूँ:\n• PM विश्वकर्मा, मुद्रा, SFURTI\n• पात्रता जाँच और दस्तावेज़ सूची\n• बैंक प्रूफ / आय प्रमाणपत्र बनाना\n\nनीचे बटन दबाएं या टाइप करें!`
+          : `Namaste ${name}! 🤖 I'm your ShilpMitra AI Agent.\n\nI can help you with:\n• PM Vishwakarma, MUDRA, SFURTI details\n• Eligibility check & document checklist\n• Generate bank proof / income certificate\n\nTap a button below or type your question!`,
+      }]);
+    }
+  }, []);
+
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [chatMessages]);
 
-  const handleSend = async () => {
-    const msg = userInput.trim();
+  // Build profile from real user data
+  const profile = useMemo(() => ({
+    id: currentUser?.id || DEMO_USER_ID,
+    name: currentUser?.name || 'Raju Kumar',
+    craft: currentUser?.craft_type || currentUser?.craft || 'Pottery',
+    location: currentUser?.location || 'Khurja, UP',
+    totalSales: currentUser?.totalSales || 81700,
+    group: currentUser?.group_status || 'OBC',
+  }), [currentUser]);
+
+  const handleSend = async (overrideMsg) => {
+    const msg = (overrideMsg || userInput).trim();
     if (!msg || isLoading) return;
     setChatMessages(prev => [...prev, { role: 'user', text: msg }]);
     setUserInput('');
     setIsLoading(true);
+
     try {
-      const result = await chatWithGemini(msg, { name: 'Raju', craft: 'Block-print', location: 'Rajasthan', totalSales: 62000 }, [...chatMessages, { role: 'user', text: msg }]);
-      setChatMessages(prev => [...prev, { role: 'ai', text: result.reply || 'कृपया दोबारा पूछें।' }]);
-    } catch {
-      setChatMessages(prev => [...prev, { role: 'ai', text: 'क्षमा करें, कृपया दोबारा कोशिश करें।', textEn: 'Connection issue. Please retry.' }]);
+      // Use the same runAgent as the floating chatbot
+      const { runAgent } = await import('../lib/agentLocal.js');
+      const data = await runAgent(msg, profile, chatMessages, lang);
+
+      const reply = lang === 'hi' ? (data.replyHi || data.reply)
+        : lang === 'kn' ? (data.replyKn || data.reply)
+        : data.reply;
+
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: reply || 'I processed your request.',
+        toolUsed: data.toolUsed,
+        suggestedActions: data.suggestedActions || [],
+      }]);
+    } catch (e) {
+      console.error('[SchemeChat] Error:', e);
+      setChatMessages(prev => [...prev, {
+        role: 'ai',
+        text: lang === 'hi'
+          ? 'क्षमा करें, कनेक्शन में समस्या हुई। कृपया पुनः प्रयास करें।'
+          : 'Sorry, connection error. Please try again.',
+        suggestedActions: lang === 'hi'
+          ? ['✅ पात्रता जाँचें', '📋 दस्तावेज़ बताएं']
+          : ['✅ Check my eligibility', '📋 What documents do I need?'],
+      }]);
     } finally { setIsLoading(false); }
   };
 
-  const statusBadge = { eligible: 'badge-eligible', 'not-yet': 'badge-not-yet', ineligible: 'badge-ineligible' };
+  const actions = quickActions[lang] || quickActions.en;
 
   return (
     <motion.div initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.06 } } }} className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 max-w-5xl mx-auto">
@@ -163,6 +229,13 @@ export default function SchemeNavigator() {
                           </div>
                         ))}
                       </div>
+                      {/* Ask AI about this scheme */}
+                      <button
+                        onClick={() => handleSend(`Explain ${s.name} scheme in detail`)}
+                        className="w-full mt-2 py-2 px-3 rounded-xl bg-gradient-to-r from-[#1F3C88] to-[#4A90E2] text-white text-sm font-semibold hover:opacity-90 transition-opacity"
+                      >
+                        🤖 Ask AI about {s.name}
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -219,23 +292,48 @@ export default function SchemeNavigator() {
         </AnimatePresence>
       </motion.section>
 
-      {/* AI Chat */}
+      {/* AI Chat — Powered by same agentLocal.js as floating chatbot */}
       <motion.section variants={fadeUp} className="bg-white rounded-xl border border-slate-100 overflow-hidden">
         <div className="flex items-center gap-2 p-4 border-b border-slate-100" style={{ background: 'linear-gradient(135deg, #1F3C88, #4A90E2)' }}>
           <span className="text-lg">🤖</span>
-          <h3 className="text-sm font-bold text-white flex-1">AI Assistant</h3>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">Gemini</span>
+          <h3 className="text-sm font-bold text-white flex-1">AI Scheme Assistant</h3>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-medium">Agent</span>
         </div>
-        <div className="max-h-[220px] overflow-y-auto hide-scrollbar space-y-2 p-4 bg-slate-50">
+
+        {/* Quick Actions */}
+        <div className="flex gap-2 p-3 overflow-x-auto hide-scrollbar border-b border-slate-50">
+          {actions.map((a, i) => (
+            <button key={i} onClick={() => handleSend(a.msg)} disabled={isLoading}
+              className="shrink-0 px-3 py-1.5 rounded-full bg-[#EAF4FF] text-[#1F3C88] text-[11px] font-semibold whitespace-nowrap hover:bg-[#1F3C88] hover:text-white transition-all disabled:opacity-40">
+              {a.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Chat Messages */}
+        <div className="max-h-[300px] overflow-y-auto hide-scrollbar space-y-2 p-4 bg-slate-50">
           {chatMessages.map((msg, i) => (
             <div key={i} className={`flex gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
               {msg.role === 'ai' && <span className="text-sm mt-1">🤖</span>}
-              <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${msg.role === 'user' ? 'bg-[#1F3C88] text-white rounded-br-md' : 'bg-white text-slate-700 rounded-bl-md border border-slate-100'}`}>
-                <p className="text-[13px]">{msg.text}</p>
-                {msg.textEn && <p className="text-[11px] mt-0.5 opacity-60">{msg.textEn}</p>}
+              <div className={`max-w-[85%] rounded-2xl px-3 py-2 ${msg.role === 'user' ? 'bg-[#1F3C88] text-white rounded-br-md' : 'bg-white text-slate-700 rounded-bl-md border border-slate-100'}`}>
+                <p className="text-[13px] whitespace-pre-line">{msg.text}</p>
+                {msg.toolUsed && msg.toolUsed !== 'none' && (
+                  <p className="text-[10px] mt-1 opacity-50">🔧 {msg.toolUsed}</p>
+                )}
               </div>
             </div>
           ))}
+          {/* Suggested actions from agent response */}
+          {chatMessages.length > 0 && chatMessages[chatMessages.length - 1]?.suggestedActions?.length > 0 && !isLoading && (
+            <div className="flex flex-wrap gap-1.5 mt-1">
+              {chatMessages[chatMessages.length - 1].suggestedActions.map((action, j) => (
+                <button key={j} onClick={() => handleSend(action)}
+                  className="px-2.5 py-1 rounded-full bg-[#EAF4FF] text-[#1F3C88] text-[11px] font-medium hover:bg-[#1F3C88] hover:text-white transition-all">
+                  {action}
+                </button>
+              ))}
+            </div>
+          )}
           {isLoading && (
             <div className="flex gap-2">
               <span className="text-sm">🤖</span>
@@ -246,10 +344,13 @@ export default function SchemeNavigator() {
           )}
           <div ref={chatEndRef} />
         </div>
+
+        {/* Input */}
         <div className="flex gap-2 p-3 border-t border-slate-100">
-          <input className="flex-1 h-10 px-3 rounded-xl bg-slate-50 text-sm border border-slate-200 focus:border-[#4A90E2] outline-none transition-colors" placeholder="Ask about schemes..."
+          <input className="flex-1 h-10 px-3 rounded-xl bg-slate-50 text-sm border border-slate-200 focus:border-[#4A90E2] outline-none transition-colors"
+            placeholder={lang === 'hi' ? 'योजना के बारे में पूछें...' : 'Ask about schemes...'}
             value={userInput} onChange={e => setUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSend()} disabled={isLoading} />
-          <button onClick={handleSend} disabled={isLoading || !userInput.trim()}
+          <button onClick={() => handleSend()} disabled={isLoading || !userInput.trim()}
             className="w-10 h-10 bg-[#1F3C88] text-white rounded-xl flex items-center justify-center hover:bg-[#4A90E2] transition-all disabled:opacity-40 text-lg">
             →
           </button>
