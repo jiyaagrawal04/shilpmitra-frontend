@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import useAppStore from '../store/appStore';
 
 const fadeUp = { hidden: { opacity: 0, y: 24 }, visible: { opacity: 1, y: 0, transition: { duration: 0.6 } } };
 const stagger = { hidden: {}, visible: { transition: { staggerChildren: 0.1 } } };
@@ -39,6 +40,7 @@ const steps = [
 
 export default function Landing() {
   const navigate = useNavigate();
+  const { language, setLanguage } = useAppStore();
 
   return (
     <div className="min-h-screen gradient-surface">
@@ -52,6 +54,9 @@ export default function Landing() {
             <span className="font-heading text-title font-bold text-primary">शिल्पमित्र</span>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')} className="w-9 h-9 text-primary-light hover:bg-primary-container transition-colors rounded-xl flex items-center justify-center" title={language === 'en' ? 'हिन्दी में बदलें' : 'Switch to English'}>
+              <span className="material-symbols-outlined text-[20px]">translate</span>
+            </button>
             <button onClick={() => navigate('/dashboard')} className="btn-ghost">Dashboard</button>
             <button onClick={() => navigate('/schemes')} className="btn-primary !py-2 !px-4 !text-body-sm !min-h-0 !rounded-lg">Check Eligibility</button>
           </div>

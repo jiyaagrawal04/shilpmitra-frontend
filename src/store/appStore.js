@@ -17,6 +17,7 @@ const useAppStore = create((set) => ({
   language: localStorage.getItem('shilpmitra_lang') || 'en',
   setLanguage: (lang) => {
     localStorage.setItem('shilpmitra_lang', lang);
+    document.documentElement.lang = lang;
     set({ language: lang });
   },
 
