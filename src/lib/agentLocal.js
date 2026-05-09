@@ -4,14 +4,19 @@
 const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 const MODEL = 'gemini-2.5-flash';
 
-async function geminiCall(prompt, retries = 1) {
+async function geminiCall(prompt, retries = 2) {
+  // In dev: use Vite proxy. In production: call Gemini API directly
+  const isDev = typeof window !== 'undefined' && window.location?.hostname === 'localhost';
+  const baseUrl = isDev
+    ? `/gemini-api/v1beta/models/${MODEL}:generateContent`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
-    const timeoutMs = 45000 + attempt * 15000; // 45s first, 60s retry
+    const timeoutMs = 30000 + attempt * 10000;
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const url = `/gemini-api/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
-      const res = await fetch(url, {
+      const res = await fetch(`${baseUrl}?key=${apiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -25,8 +30,8 @@ async function geminiCall(prompt, retries = 1) {
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
       return JSON.parse(text.replace(/```json\n?|```/g, '').trim());
     } catch (e) {
-      if ((e.name === 'AbortError' || e.message?.includes('Gemini')) && attempt < retries) {
-        console.warn(`[agent-local] geminiCall attempt ${attempt + 1} failed, retrying...`);
+      if (attempt < retries) {
+        console.warn(`[agent-local] geminiCall attempt ${attempt + 1} failed:`, e.message);
         await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
         continue;
       }

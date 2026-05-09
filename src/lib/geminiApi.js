@@ -9,7 +9,11 @@ console.log('[Gemini] API Key present:', !!apiKey);
 
 // ─── CORE FETCH HELPER ────────────────────────────────────────
 async function geminiGenerate(contents, jsonMode = true, timeoutMs = 45000) {
-  const url = `/gemini-api/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
+  const isDev = typeof window !== 'undefined' && window.location?.hostname === 'localhost';
+  const baseUrl = isDev
+    ? `/gemini-api/v1beta/models/${MODEL}:generateContent`
+    : `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+  const url = `${baseUrl}?key=${apiKey}`;
 
   const body = {
     contents,
